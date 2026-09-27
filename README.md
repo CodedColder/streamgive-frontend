@@ -84,6 +84,18 @@ Next.js inlines `NEXT_PUBLIC_*` vars at build time. Restart `npm run dev`
 after editing `.env`; in Docker, rebuild the image rather than swapping
 `--env-file` on an existing image.
 
+**Impact page feels slow / makes a lot of requests**
+The `/impact` page polls every 20 seconds instead of receiving live updates
+(there's no websocket/SSE push from the backend), and each poll is an N+1
+fetch — it lists every verified NGO, then fetches each NGO's profile
+individually and sums the totals client-side, because the backend has no
+platform-wide aggregate endpoint. That's `1 + N` requests per poll, where
+`N` is the NGO count. This is known tech debt; see the comment above
+`POLL_INTERVAL_MS` in `src/app/impact/page.tsx` and the docblock on
+`loadPlatformImpact` in `src/lib/impact.ts` for details, and fix candidates
+if you're picking this up (a real backend aggregate endpoint, or at least a
+longer interval / backoff).
+
 ## Related repositories
 
 - [streamgive-contracts](https://github.com/streamgive/streamgive-contracts) — Soroban smart contracts
