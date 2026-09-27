@@ -6,7 +6,7 @@ import { useToast } from '@/components/toast/ToastProvider';
 import { useWallet } from '@/components/wallet/WalletProvider';
 import type { Stream } from '@/lib/api';
 import { getDonationVaultClient } from '@/lib/donationVaultClient';
-import { parseAmount } from '@/lib/format';
+import { parseAmount, TOKEN_DECIMALS } from '@/lib/format';
 
 /**
  * Computes the per-second token rate for a stream modification.
@@ -177,34 +177,44 @@ export function StreamControls({ stream, onChanged }: { stream: Stream; onChange
   }
 
   if (mode === 'modifying') {
+    const previewRate = computeModifyRate(stream.balance, durationSeconds);
+    const previewEndDate = new Date(Date.now() + durationSeconds * 1000);
+
     return (
-      <div className="flex items-center gap-2">
-        <select
-          value={durationSeconds}
-          onChange={(event) => setDurationSeconds(Number(event.target.value))}
-          aria-label="New duration to stream the remaining balance over"
-          className="rounded-md border border-gray-300 px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-900"
-        >
-          {DURATIONS.map((d) => (
-            <option key={d.seconds} value={d.seconds}>
-              {d.label}
-            </option>
-          ))}
-        </select>
-        <button
-          type="button"
-          onClick={() => void handleModifyRate()}
-          className="rounded-md bg-black px-3 py-1 text-sm font-medium text-white dark:bg-white dark:text-black"
-        >
-          Confirm
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode('idle')}
-          className="rounded-md border border-gray-300 px-3 py-1 text-sm font-medium dark:border-gray-700"
-        >
-          Back
-        </button>
+      <div className="flex flex-col items-end gap-1">
+        <div className="flex items-center gap-2">
+          <select
+            value={durationSeconds}
+            onChange={(event) => setDurationSeconds(Number(event.target.value))}
+            aria-label="New duration to stream the remaining balance over"
+            className="rounded-md border border-gray-300 px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-900"
+          >
+            {DURATIONS.map((d) => (
+              <option key={d.seconds} value={d.seconds}>
+                {d.label}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => void handleModifyRate()}
+            className="rounded-md bg-black px-3 py-1 text-sm font-medium text-white dark:bg-white dark:text-black"
+          >
+            Confirm
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode('idle')}
+            className="rounded-md border border-gray-300 px-3 py-1 text-sm font-medium dark:border-gray-700"
+          >
+            Back
+          </button>
+        </div>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          {previewRate !== null
+            ? `${(Number(previewRate) / 10 ** TOKEN_DECIMALS).toFixed(7)} per second, ending ${previewEndDate.toLocaleDateString()}.`
+            : 'Remaining balance is too small to stream over this duration — try a shorter one.'}
+        </p>
       </div>
     );
   }

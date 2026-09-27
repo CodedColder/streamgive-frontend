@@ -33,9 +33,12 @@ export function getUsdcAssetAddress(): string {
 
 const PUBLIC_NETWORK_PASSPHRASE = 'Public Global Stellar Network ; September 2015';
 
+/** Human-readable name for whichever network NETWORK_PASSPHRASE selects. */
+export const NETWORK_NAME = NETWORK_PASSPHRASE === PUBLIC_NETWORK_PASSPHRASE ? 'Mainnet' : 'Testnet';
+
 /** Builds a stellar.expert URL for an account (wallet/NGO) or contract
  * (token) address, pointed at whichever network NETWORK_PASSPHRASE selects. */
 export function explorerUrl(kind: 'account' | 'contract', id: string): string {
-  const network = NETWORK_PASSPHRASE === PUBLIC_NETWORK_PASSPHRASE ? 'public' : 'testnet';
+  const network = NETWORK_NAME === 'Mainnet' ? 'public' : 'testnet';
   return `https://stellar.expert/explorer/${network}/${kind}/${id}`;
 }
