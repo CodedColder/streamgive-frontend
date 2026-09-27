@@ -90,6 +90,25 @@ after editing `.env`; in Docker, rebuild the image rather than swapping
 - [streamgive-backend](https://github.com/streamgive/streamgive-backend) — indexer & API
 - [streamgive-docs](https://github.com/streamgive/streamgive-docs) — documentation
 
+## Routes
+
+This table lists every route under `src/app`, who it is meant for, and its technical requirements.
+
+| Route | Audience | Wallet / Admin Required? | Component Type |
+|---|---|---|---|
+| `/` | Public | No | Server Component |
+| `/apply` | NGO Applicant | Yes (Wallet) | Client Component |
+| `/dashboard` | Donor | Yes (Wallet) | Client Component |
+| `/embed/[ngoId]` | Embed Consumer (iframe) | No | Server Component |
+| `/impact` | Public / Donor / NGO | No | Client Component |
+| `/ngo-admin` | NGO Admin | Yes (Wallet) | Client Component |
+| `/ngos` | Public | No | Server Component |
+| `/ngos/[id]` | Public | No | Server Component |
+| `/ngos/[id]/donate` | Donor | No (Form requires Wallet) | Server Component |
+| `/platform-admin` | Platform Admin | Yes (Wallet + `ADMIN_ADDRESS`) | Client Component |
+
+See the [Embed Widget Guide](./EMBED.md) for details on embedding the `/embed/[ngoId]` widget.
+
 ## Contributing
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for the accessibility checklist to
