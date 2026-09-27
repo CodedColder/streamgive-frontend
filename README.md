@@ -42,7 +42,9 @@ container startup — rebuild the image after changing any of them, an
 
 Either way, `/embed/*` is deliberately exempt from the `X-Frame-Options`
 header the app sets everywhere else (see `src/middleware.ts`) — that
-route exists specifically to be iframed on NGOs' own sites.
+route exists specifically to be iframed on NGOs' own sites. See
+[docs/EMBED.md](./docs/EMBED.md) for the full integration guide (sizing,
+security headers, and WordPress/Webflow/plain-HTML examples).
 
 ## Authentication
 
