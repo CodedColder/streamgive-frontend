@@ -35,6 +35,53 @@ export function parseAmount(input: string): bigint | null {
   return raw > 0n ? raw : null;
 }
 
+const SECONDS_PER_MINUTE = 60;
+const SECONDS_PER_HOUR = 60 * SECONDS_PER_MINUTE;
+const SECONDS_PER_DAY = 24 * SECONDS_PER_HOUR;
+
+function pluralize(count: number, unit: string): string {
+  return `${count} ${unit}${count === 1 ? '' : 's'}`;
+}
+
+/**
+ * Estimates how long a stream's remaining balance will last at its current
+ * rate, as a human-readable string (e.g. "~3 days remaining").
+ *
+ * `balance` and `rate` are both raw i128 strings at the same token scale
+ * (see TOKEN_DECIMALS), so dividing one by the other cancels the scale out
+ * and yields a plain number of seconds — no decimal conversion needed.
+ *
+ * @param balance - The stream's remaining raw balance.
+ * @param rate - The stream's raw per-second rate.
+ * @returns "Fully drained" once the balance is zero, "" if the rate is zero
+ * (nothing to divide by — a stream that isn't actually draining), or an
+ * "~N unit(s) remaining" estimate otherwise.
+ */
+export function formatRemainingDuration(balance: string, rate: string): string {
+  const balanceRaw = BigInt(balance);
+  if (balanceRaw <= 0n) {
+    return 'Fully drained';
+  }
+
+  const rateRaw = BigInt(rate);
+  if (rateRaw <= 0n) {
+    return '';
+  }
+
+  const totalSeconds = Number(balanceRaw / rateRaw);
+
+  if (totalSeconds < SECONDS_PER_MINUTE) {
+    return `~${pluralize(totalSeconds, 'second')} remaining`;
+  }
+  if (totalSeconds < SECONDS_PER_HOUR) {
+    return `~${pluralize(Math.floor(totalSeconds / SECONDS_PER_MINUTE), 'minute')} remaining`;
+  }
+  if (totalSeconds < SECONDS_PER_DAY) {
+    return `~${pluralize(Math.floor(totalSeconds / SECONDS_PER_HOUR), 'hour')} remaining`;
+  }
+  return `~${pluralize(Math.floor(totalSeconds / SECONDS_PER_DAY), 'day')} remaining`;
+}
+
 /** Shortens a wallet/contract address to its first and last 4 characters.
  * Returns the original string unchanged if it is too short to truncate
  * without the two halves overlapping (i.e. fewer than 9 characters). */

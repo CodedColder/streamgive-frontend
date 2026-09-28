@@ -8,6 +8,9 @@ platform for verified NGOs on Stellar.
 - Next.js (App Router), React, TypeScript
 - Tailwind CSS
 
+See [docs/COMPONENTS.md](./docs/COMPONENTS.md) for a component tree of
+`src/components/` with a one-line description of each piece.
+
 ## Local development
 
 ```
@@ -39,7 +42,37 @@ container startup — rebuild the image after changing any of them, an
 
 Either way, `/embed/*` is deliberately exempt from the `X-Frame-Options`
 header the app sets everywhere else (see `src/middleware.ts`) — that
-route exists specifically to be iframed on NGOs' own sites.
+route exists specifically to be iframed on NGOs' own sites. See
+[docs/EMBED.md](./docs/EMBED.md) for the full integration guide (sizing,
+security headers, and WordPress/Webflow/plain-HTML examples).
+
+## Authentication
+
+The platform admin panel (`/platform-admin`) has no separate login — it
+authenticates by having the connected wallet sign a message per request,
+rather than by holding a session cookie or API key.
+
+For each admin request, `adminFetch` in
+[`src/lib/adminApi.ts`](./src/lib/adminApi.ts) signs the string
+`${method}:${path}:${timestamp}` via `signMessage` (from
+[`src/components/wallet/WalletProvider.tsx`](./src/components/wallet/WalletProvider.tsx),
+which wraps `StellarWalletsKit.signMessage`) and sends the address,
+signature and timestamp as the `x-admin-address`, `x-admin-signature` and
+`x-admin-timestamp` headers. The backend's `requireAdminSignature` verifies
+the signature was produced by the address configured as `ADMIN_ADDRESS` and
+that the timestamp is within its clock-skew window, rejecting anything else
+with a 401 — there's no separate allowlist or role table on the frontend
+side to keep in sync.
+
+Signing prompts the wallet extension, so `adminApi.ts` caches a signature
+per `address:method:path` for a few minutes (`SIGNATURE_REUSE_WINDOW_MS`)
+and reuses it across requests instead of prompting on every page visit. A
+reused signature that gets rejected (e.g. the server clock has moved past
+the reuse window) triggers exactly one retry with a freshly signed message.
+
+Because authorization is entirely signature-based, only the wallet holding
+the private key for `ADMIN_ADDRESS` can act on `/platform-admin` — there is
+no separate admin account or password to provision or rotate.
 
 ## Troubleshooting
 

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
+import { ConnectWalletPrompt } from '@/components/common/ConnectWalletPrompt';
 import { CopyAddressButton } from '@/components/common/CopyAddressButton';
 import { Footer } from '@/components/layout/Footer';
 import { Header } from '@/components/layout/Header';
@@ -13,7 +14,7 @@ import { truncateAddress } from '@/lib/format';
 import { getNgoRegistryClient } from '@/lib/ngoRegistryClient';
 
 export default function PlatformAdminPage() {
-  const { address, connect, signMessage, signTransaction } = useWallet();
+  const { address, signMessage, signTransaction } = useWallet();
   const { showToast } = useToast();
   const [applications, setApplications] = useState<NgoApplication[]>([]);
   const [loading, setLoading] = useState(false);
@@ -97,16 +98,7 @@ export default function PlatformAdminPage() {
         </p>
 
         {!address && (
-          <div className="mt-8 rounded-lg border border-gray-200 p-6 text-center dark:border-gray-800">
-            <p className="text-gray-600 dark:text-gray-400">Connect the platform admin wallet.</p>
-            <button
-              type="button"
-              onClick={() => void connect()}
-              className="mt-4 rounded-md bg-black px-6 py-3 text-sm font-medium text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
-            >
-              Connect Wallet
-            </button>
-          </div>
+          <ConnectWalletPrompt className="mt-8" message="Connect the platform admin wallet." />
         )}
 
         {address && loading && (
