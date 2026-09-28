@@ -2,13 +2,31 @@
 // places — fixed by the protocol, not something per-asset to look up.
 export const TOKEN_DECIMALS = 7;
 
+// Decimal separator for the active locale, derived without touching the
+// raw amount so it can't be a source of precision loss itself.
+const DECIMAL_SEPARATOR = (1.1).toLocaleString(undefined, {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+})[1];
+
 /** Formats a raw i128 amount string (as returned by the backend) into a
- * human-readable decimal. Safe for typical donation-sized amounts; not
- * intended for values anywhere near Number.MAX_SAFE_INTEGER. */
+ * human-readable decimal. Splits the integer/fractional parts on the
+ * BigInt directly, so precision is preserved even for values well past
+ * Number.MAX_SAFE_INTEGER. */
 export function formatAmount(raw: string): string {
-  return (Number(BigInt(raw)) / 10 ** TOKEN_DECIMALS).toLocaleString(undefined, {
-    maximumFractionDigits: 7,
-  });
+  const value = BigInt(raw);
+  const isNegative = value < 0n;
+  const abs = isNegative ? -value : value;
+  const divisor = 10n ** BigInt(TOKEN_DECIMALS);
+
+  const whole = abs / divisor;
+  const fraction = abs % divisor;
+
+  const wholeStr = whole.toLocaleString(undefined);
+  const fractionStr = fraction.toString().padStart(TOKEN_DECIMALS, '0').replace(/0+$/, '');
+
+  const formatted = fractionStr ? `${wholeStr}${DECIMAL_SEPARATOR}${fractionStr}` : wholeStr;
+  return isNegative ? `-${formatted}` : formatted;
 }
 
 /** Parses a user-typed decimal amount (e.g. from a text input) into a raw

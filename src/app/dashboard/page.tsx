@@ -30,6 +30,16 @@ export default function DashboardPage() {
   const [loadError, setLoadError] = useState(false);
   const [detailsStream, setDetailsStream] = useState<Stream | null>(null);
 
+  // Drop any streams fetched under a previous address as soon as `address`
+  // changes, during render rather than in an effect, so a stale list from
+  // the old wallet is never painted (even briefly) under the new one.
+  const [prevAddress, setPrevAddress] = useState(address);
+  if (address !== prevAddress) {
+    setPrevAddress(address);
+    setStreams([]);
+    setLoadError(false);
+  }
+
   const refresh = useCallback(() => {
     if (!address) {
       setStreams([]);
