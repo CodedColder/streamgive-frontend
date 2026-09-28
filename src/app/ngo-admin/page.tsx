@@ -22,6 +22,17 @@ export default function NgoAdminPage() {
   const [loadError, setLoadError] = useState(false);
   const [detailsStream, setDetailsStream] = useState<Stream | null>(null);
 
+  // Drop any NGO match/streams fetched under a previous address as soon as
+  // `address` changes, during render rather than in an effect, so stale data
+  // from the old wallet is never painted (even briefly) under the new one.
+  const [prevAddress, setPrevAddress] = useState(address);
+  if (address !== prevAddress) {
+    setPrevAddress(address);
+    setNgo(undefined);
+    setStreams([]);
+    setLoadError(false);
+  }
+
   const refresh = useCallback(async () => {
     if (!address) {
       setNgo(undefined);
