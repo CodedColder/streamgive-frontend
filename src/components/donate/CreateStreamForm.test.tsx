@@ -2,6 +2,8 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { useDonationVaultClient } from '@/lib/donationVaultClient';
+
 import { CreateStreamForm } from './CreateStreamForm';
 
 const DONOR_ADDRESS = 'G' + 'D'.repeat(55);
@@ -28,14 +30,26 @@ vi.mock('@/lib/stellar', () => ({
 const mockCreateStream = vi.fn();
 
 vi.mock('@/lib/donationVaultClient', () => ({
-  getDonationVaultClient: vi.fn(async () => ({
-    create_stream: mockCreateStream,
-  })),
+  useDonationVaultClient: vi.fn(),
 }));
 
 describe('CreateStreamForm', () => {
   beforeEach(() => {
     mockCreateStream.mockReset();
+    vi.mocked(useDonationVaultClient).mockReturnValue({
+      client: { create_stream: mockCreateStream } as never,
+      ready: true,
+    });
+  });
+
+  it('disables submit and shows a loading label while the contract client is not ready', async () => {
+    vi.mocked(useDonationVaultClient).mockReturnValue({ client: null, ready: false });
+
+    const user = userEvent.setup();
+    render(<CreateStreamForm ngoAddress={NGO_ADDRESS} />);
+    await user.type(screen.getByPlaceholderText('100'), '100');
+
+    expect(screen.getByRole('button', { name: /preparing contract/i })).toBeDisabled();
   });
 
   it('disables submit until a valid amount is entered', async () => {
@@ -113,5 +127,21 @@ describe('CreateStreamForm', () => {
       deposit: 1_000_000_000n,
       rate: 1_000_000_000n / (30n * 24n * 60n * 60n),
     });
+  });
+
+  it('shows the estimated network fee once the transaction is assembled', async () => {
+    mockCreateStream.mockResolvedValue({
+      built: { fee: '1000000' },
+      signAndSend: () => new Promise(() => {}),
+    });
+
+    const user = userEvent.setup();
+    render(<CreateStreamForm ngoAddress={NGO_ADDRESS} />);
+
+    await user.type(screen.getByPlaceholderText('100'), '100');
+    await user.click(screen.getByRole('button', { name: /review & sign/i }));
+
+    // 1 000 000 stroops = 0.1 XLM.
+    expect(await screen.findByText(/estimated network fee: ≈ 0.1 xlm/i)).toBeInTheDocument();
   });
 });
