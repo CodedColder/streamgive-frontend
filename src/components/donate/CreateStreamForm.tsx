@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 
 import { useWallet } from '@/components/wallet/WalletProvider';
@@ -17,7 +18,21 @@ const DURATIONS = [
 type TokenChoice = 'native' | 'usdc' | 'custom';
 type SubmitState = 'idle' | 'signing' | 'success' | 'error';
 
-export function CreateStreamForm({ ngoAddress }: { ngoAddress: string }) {
+export function CreateStreamForm({
+  ngoAddress,
+  ngoId,
+}: {
+  ngoAddress: string;
+  /**
+   * The NGO's internal id (route/lookup key, distinct from `ngoAddress`),
+   * used to navigate to /ngos/[ngoId]/donate/success on a successful
+   * create_stream. Omitted by the embed widget, which stays on its own
+   * page — a full-site navigation would break out of the iframe's layout
+   * — and falls back to the inline success card below instead.
+   */
+  ngoId?: string;
+}) {
+  const router = useRouter();
   const { address, connect } = useWallet();
   const { client, ready } = useDonationVaultClient();
 
@@ -80,9 +95,13 @@ export function CreateStreamForm({ ngoAddress }: { ngoAddress: string }) {
       setEstimatedFee(formatEstimatedFee(tx.built?.fee));
 
       const { result } = await tx.signAndSend();
+      const newStreamId = String(result);
 
-      setStreamId(String(result));
+      setStreamId(newStreamId);
       setSubmitState('success');
+      if (ngoId) {
+        router.push(`/ngos/${ngoId}/donate/success?streamId=${newStreamId}`);
+      }
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : 'Something went wrong.');
       setSubmitState('error');
