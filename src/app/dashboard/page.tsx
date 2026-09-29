@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
+import { ConnectWalletPrompt } from '@/components/common/ConnectWalletPrompt';
 import { StreamControls } from '@/components/dashboard/StreamControls';
 import { Footer } from '@/components/layout/Footer';
 import { Header } from '@/components/layout/Header';
@@ -10,7 +11,7 @@ import { StreamDetailsModal } from '@/components/streams/StreamDetailsModal';
 import { useWallet } from '@/components/wallet/WalletProvider';
 import { getStreams, type Stream } from '@/lib/api';
 import { buildDonationHistoryCsv } from '@/lib/csv';
-import { formatAmount } from '@/lib/format';
+import { formatAmount, formatRemainingDuration } from '@/lib/format';
 
 // Client-side pagination over the already-fetched list — same interim
 // approach as NgoExplorer, until the backend exposes real limit/offset
@@ -28,12 +29,22 @@ function downloadDonationHistoryCsv(streams: Stream[]): void {
 }
 
 export default function DashboardPage() {
-  const { address, connect } = useWallet();
+  const { address } = useWallet();
   const [streams, setStreams] = useState<Stream[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [detailsStream, setDetailsStream] = useState<Stream | null>(null);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+
+  // Drop any streams fetched under a previous address as soon as `address`
+  // changes, during render rather than in an effect, so a stale list from
+  // the old wallet is never painted (even briefly) under the new one.
+  const [prevAddress, setPrevAddress] = useState(address);
+  if (address !== prevAddress) {
+    setPrevAddress(address);
+    setStreams([]);
+    setLoadError(false);
+  }
 
   const refresh = useCallback(() => {
     if (!address) {
@@ -59,12 +70,9 @@ export default function DashboardPage() {
     refresh();
   }, [refresh]);
 
-  useEffect(() => {
-    // Reset to the first page only when the connected wallet changes — not
-    // on every refresh(), which also fires after actions like a top-up on
-    // a stream further down an already-expanded list.
-    setVisibleCount(PAGE_SIZE);
-  }, [address]);
+  const applyOptimisticUpdate = useCallback((streamId: string, patch: Partial<Stream>) => {
+    setStreams((prev) => prev.map((s) => (s.id === streamId ? { ...s, ...patch } : s)));
+  }, []);
 
   const totalCommitted = streams.reduce(
     (sum, s) => sum + BigInt(s.balance) + BigInt(s.withdrawn),
@@ -81,16 +89,7 @@ export default function DashboardPage() {
         <h1 className="text-2xl font-bold">Your donations</h1>
 
         {!address && (
-          <div className="mt-8 rounded-lg border border-gray-200 p-6 text-center dark:border-gray-800">
-            <p className="text-gray-600 dark:text-gray-400">Connect your wallet to see your streams.</p>
-            <button
-              type="button"
-              onClick={() => void connect()}
-              className="mt-4 rounded-md bg-black px-6 py-3 text-sm font-medium text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
-            >
-              Connect Wallet
-            </button>
-          </div>
+          <ConnectWalletPrompt className="mt-8" message="Connect your wallet to see your streams." />
         )}
 
         {address && loading && (
@@ -145,39 +144,47 @@ export default function DashboardPage() {
             </div>
 
             <ul className="mt-8 space-y-4">
-              {visibleStreams.map((stream) => (
-                <li
-                  key={stream.id}
-                  className="rounded-lg border border-gray-200 p-6 dark:border-gray-800"
-                >
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <Link
-                        href={`/ngos/${stream.ngo.id}`}
-                        className="font-semibold hover:underline"
-                      >
-                        {stream.ngo.name}
-                      </Link>
-                      <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        {stream.status === 'ACTIVE' ? 'Active' : 'Cancelled'} · Balance{' '}
-                        {formatAmount(stream.balance)} · Withdrawn {formatAmount(stream.withdrawn)}
-                      </p>
+              {streams.map((stream) => {
+                const remaining = formatRemainingDuration(stream.balance, stream.rate);
+                return (
+                  <li
+                    key={stream.id}
+                    className="rounded-lg border border-gray-200 p-6 dark:border-gray-800"
+                  >
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <Link
+                          href={`/ngos/${stream.ngo.id}`}
+                          className="font-semibold hover:underline"
+                        >
+                          {stream.ngo.name}
+                        </Link>
+                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                          {stream.status === 'ACTIVE' ? 'Active' : 'Cancelled'} · Balance{' '}
+                          {formatAmount(stream.balance)} · Withdrawn {formatAmount(stream.withdrawn)}
+                          {remaining ? ` · ${remaining}` : ''}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setDetailsStream(stream)}
+                          className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
+                        >
+                          View details
+                        </button>
+                        {stream.status === 'ACTIVE' && (
+                          <StreamControls
+                            stream={stream}
+                            onChanged={refresh}
+                            onOptimisticUpdate={(patch) => applyOptimisticUpdate(stream.id, patch)}
+                          />
+                        )}
+                      </div>
                     </div>
-                    <div className="flex flex-wrap items-center justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setDetailsStream(stream)}
-                        className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
-                      >
-                        View details
-                      </button>
-                      {stream.status === 'ACTIVE' && (
-                        <StreamControls stream={stream} onChanged={refresh} />
-                      )}
-                    </div>
-                  </div>
-                </li>
-              ))}
+                  </li>
+                );
+              })}
             </ul>
 
             {hasMore && (

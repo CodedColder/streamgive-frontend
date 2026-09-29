@@ -41,9 +41,24 @@ type Mode = 'idle' | 'toppingUp' | 'modifying' | 'confirmingCancel';
 // actually happening instead of reading "Cancelling…" for everything.
 type PendingAction = 'topUp' | 'modifyRate' | 'cancel' | null;
 
-export function StreamControls({ stream, onChanged }: { stream: Stream; onChanged: () => void }) {
-  const { address } = useWallet();
-  const { client, ready } = useDonationVaultClient();
+export function StreamControls({
+  stream,
+  onChanged,
+  onOptimisticUpdate,
+}: {
+  stream: Stream;
+  onChanged: () => void;
+  /**
+   * Applies an immediate local patch to this stream, ahead of onChanged()'s
+   * re-fetch — the indexer that backs that re-fetch polls on an interval,
+   * so without this the UI would sit on stale numbers for a few seconds
+   * after a confirmed on-chain action. Whatever the re-fetch eventually
+   * returns still wins once it lands, rolling this guess back if it turns
+   * out to have been wrong.
+   */
+  onOptimisticUpdate?: (patch: Partial<Stream>) => void;
+}) {
+  const { address, signTransaction } = useWallet();
   const { showToast } = useToast();
   const [mode, setMode] = useState<Mode>('idle');
   const [pending, setPending] = useState<PendingAction>(null);
@@ -67,6 +82,7 @@ export function StreamControls({ stream, onChanged }: { stream: Stream; onChange
       await tx.signAndSend();
       showToast('success', `Stream topped up — ${INDEXING_LAG_NOTE}.`);
       setTopUpAmount('');
+      onOptimisticUpdate?.({ balance: (BigInt(stream.balance) + topUpAmountRaw).toString() });
       onChanged();
     } catch (err) {
       showToast('error', err instanceof Error ? err.message : 'Something went wrong.');
@@ -85,6 +101,7 @@ export function StreamControls({ stream, onChanged }: { stream: Stream; onChange
       setEstimatedFee(formatEstimatedFee(tx.built?.fee));
       await tx.signAndSend();
       showToast('success', `Stream cancelled — ${INDEXING_LAG_NOTE}.`);
+      onOptimisticUpdate?.({ status: 'CANCELLED' });
       onChanged();
     } catch (err) {
       showToast('error', err instanceof Error ? err.message : 'Something went wrong.');

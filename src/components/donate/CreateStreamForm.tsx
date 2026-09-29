@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 
+import { ConnectWalletPrompt } from '@/components/common/ConnectWalletPrompt';
 import { useWallet } from '@/components/wallet/WalletProvider';
 import { useDonationVaultClient } from '@/lib/donationVaultClient';
 import { formatEstimatedFee, parseAmount, TOKEN_DECIMALS } from '@/lib/format';
@@ -18,23 +19,8 @@ const DURATIONS = [
 type TokenChoice = 'native' | 'usdc' | 'custom';
 type SubmitState = 'idle' | 'signing' | 'success' | 'error';
 
-export function CreateStreamForm({
-  ngoAddress,
-  ngoId,
-}: {
-  ngoAddress: string;
-  /**
-   * The NGO's internal id (route/lookup key, distinct from `ngoAddress`),
-   * used to navigate to /ngos/[ngoId]/donate/success on a successful
-   * create_stream. Omitted by the embed widget, which stays on its own
-   * page — a full-site navigation would break out of the iframe's layout
-   * — and falls back to the inline success card below instead.
-   */
-  ngoId?: string;
-}) {
-  const router = useRouter();
-  const { address, connect } = useWallet();
-  const { client, ready } = useDonationVaultClient();
+export function CreateStreamForm({ ngoAddress }: { ngoAddress: string }) {
+  const { address, signTransaction } = useWallet();
 
   const [tokenChoice, setTokenChoice] = useState<TokenChoice>('native');
   const [customToken, setCustomToken] = useState('');
@@ -135,18 +121,7 @@ export function CreateStreamForm({
   }
 
   if (!address) {
-    return (
-      <div className="rounded-lg border border-gray-200 p-6 text-center dark:border-gray-800">
-        <p className="text-gray-600 dark:text-gray-400">Connect your wallet to start a stream.</p>
-        <button
-          type="button"
-          onClick={() => void connect()}
-          className="mt-4 rounded-md bg-black px-6 py-3 text-sm font-medium text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
-        >
-          Connect Wallet
-        </button>
-      </div>
-    );
+    return <ConnectWalletPrompt message="Connect your wallet to start a stream." />;
   }
 
   return (
