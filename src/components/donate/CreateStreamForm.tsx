@@ -3,8 +3,8 @@
 import { useState, type FormEvent } from 'react';
 
 import { useWallet } from '@/components/wallet/WalletProvider';
-import { getDonationVaultClient } from '@/lib/donationVaultClient';
-import { parseAmount, TOKEN_DECIMALS } from '@/lib/format';
+import { useDonationVaultClient } from '@/lib/donationVaultClient';
+import { formatEstimatedFee, parseAmount, TOKEN_DECIMALS } from '@/lib/format';
 import { DONATION_VAULT_CONTRACT_ID, getNativeAssetAddress, getUsdcAssetAddress } from '@/lib/stellar';
 
 const DURATIONS = [
@@ -18,7 +18,8 @@ type TokenChoice = 'native' | 'usdc' | 'custom';
 type SubmitState = 'idle' | 'signing' | 'success' | 'error';
 
 export function CreateStreamForm({ ngoAddress }: { ngoAddress: string }) {
-  const { address, connect, signTransaction } = useWallet();
+  const { address, connect } = useWallet();
+  const { client, ready } = useDonationVaultClient();
 
   const [tokenChoice, setTokenChoice] = useState<TokenChoice>('native');
   const [customToken, setCustomToken] = useState('');
@@ -27,6 +28,7 @@ export function CreateStreamForm({ ngoAddress }: { ngoAddress: string }) {
   const [submitState, setSubmitState] = useState<SubmitState>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [streamId, setStreamId] = useState<string | null>(null);
+  const [estimatedFee, setEstimatedFee] = useState<string | null>(null);
 
   const depositRaw = parseAmount(amount);
   const isAmountValid = depositRaw !== null;
@@ -43,16 +45,18 @@ export function CreateStreamForm({ ngoAddress }: { ngoAddress: string }) {
   const isTokenValid =
     tokenChoice !== 'custom' ||
     (customTokenTrimmed.length > 0 && STELLAR_CONTRACT_RE.test(customTokenTrimmed));
-  const canSubmit = isAmountValid && isRateValid && isTokenValid && submitState !== 'signing';
+  const canSubmit =
+    isAmountValid && isRateValid && isTokenValid && submitState !== 'signing' && ready;
 
   async function handleSubmit(event: FormEvent): Promise<void> {
     event.preventDefault();
-    if (!canSubmit || !address || depositRaw === null || rateRaw === null) {
+    if (!canSubmit || !address || !client || depositRaw === null || rateRaw === null) {
       return;
     }
 
     setSubmitState('signing');
     setErrorMessage(null);
+    setEstimatedFee(null);
 
     try {
       const tokenAddress =
@@ -62,7 +66,6 @@ export function CreateStreamForm({ ngoAddress }: { ngoAddress: string }) {
             ? getUsdcAssetAddress()
             : customToken.trim();
 
-      const client = await getDonationVaultClient(address, signTransaction);
       const tx = await client.create_stream({
         donor: address,
         ngo: ngoAddress,
@@ -70,6 +73,12 @@ export function CreateStreamForm({ ngoAddress }: { ngoAddress: string }) {
         deposit: depositRaw,
         rate: rateRaw,
       });
+
+      // Client.create_stream already simulated the call to assemble this
+      // transaction, so the fee estimate is ready here — shown before
+      // signAndSend() goes on to trigger the wallet's signing prompt.
+      setEstimatedFee(formatEstimatedFee(tx.built?.fee));
+
       const { result } = await tx.signAndSend();
 
       setStreamId(String(result));
@@ -77,6 +86,8 @@ export function CreateStreamForm({ ngoAddress }: { ngoAddress: string }) {
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : 'Something went wrong.');
       setSubmitState('error');
+    } finally {
+      setEstimatedFee(null);
     }
   }
 
@@ -206,6 +217,12 @@ export function CreateStreamForm({ ngoAddress }: { ngoAddress: string }) {
         </p>
       )}
 
+      {submitState === 'signing' && estimatedFee && (
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          Estimated network fee: {estimatedFee}
+        </p>
+      )}
+
       {submitState === 'error' && errorMessage && (
         <p className="text-sm text-red-600 dark:text-red-400">{errorMessage}</p>
       )}
@@ -215,7 +232,11 @@ export function CreateStreamForm({ ngoAddress }: { ngoAddress: string }) {
         disabled={!canSubmit}
         className="w-full rounded-md bg-black px-6 py-3 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-gray-200"
       >
-        {submitState === 'signing' ? 'Confirm in your wallet…' : 'Review & Sign'}
+        {submitState === 'signing'
+          ? 'Confirm in your wallet…'
+          : !ready
+            ? 'Preparing contract…'
+            : 'Review & Sign'}
       </button>
     </form>
   );
