@@ -38,6 +38,33 @@ describe('api network errors', () => {
     await expect(getStreams({ donor: 'GABC' })).rejects.toThrow(TypeError);
     await expect(getStreams({ donor: 'GABC' })).rejects.toThrow('fetch failed');
   });
+
+  it('rejects once a stalled request hits the 10s timeout', async () => {
+    vi.useFakeTimers();
+    try {
+      // A realistic hung fetch: the promise it returns never settles on its
+      // own — it only rejects if/when the signal passed to it aborts, same
+      // as a real fetch() would once AbortSignal.timeout() fires.
+      vi.stubGlobal(
+        'fetch',
+        vi.fn((_url: string, options?: { signal?: AbortSignal }) => {
+          return new Promise((_resolve, reject) => {
+            options?.signal?.addEventListener('abort', () => {
+              reject(options.signal?.reason);
+            });
+          });
+        }),
+      );
+
+      const pending = getNgos();
+
+      await vi.advanceTimersByTimeAsync(10_000);
+
+      await expect(pending).rejects.toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------
