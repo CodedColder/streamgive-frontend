@@ -22,6 +22,11 @@ const mockGetNetwork = vi.fn().mockResolvedValue({
   network: 'TESTNET',
   networkPassphrase: NETWORK_PASSPHRASE,
 });
+// Defaults to "a wallet is installed" so existing connect-flow tests reach
+// authModal() as before — the no-wallet-detected tests override this.
+const mockGetSupportedWallets = vi.fn().mockResolvedValue([
+  { id: 'freighter', name: 'Freighter', url: 'https://freighter.app', isAvailable: true },
+]);
 
 vi.mock('@creit.tech/stellar-wallets-kit/sdk', () => ({
   StellarWalletsKit: {
@@ -29,6 +34,7 @@ vi.mock('@creit.tech/stellar-wallets-kit/sdk', () => ({
     getAddress: (...args: unknown[]) => mockGetAddress(...args),
     authModal: (...args: unknown[]) => mockAuthModal(...args),
     getNetwork: (...args: unknown[]) => mockGetNetwork(...args),
+    getSupportedWallets: (...args: unknown[]) => mockGetSupportedWallets(...args),
     signTransaction: vi.fn(),
     signMessage: (...args: unknown[]) => mockSignMessage(...args),
   },
@@ -86,6 +92,28 @@ function renderButtonWithProbe() {
   );
 }
 
+/** Exposes the raw address/connecting state, rather than inferring it from
+ * which button label ConnectWalletButton happens to render. */
+function WalletStateProbe() {
+  const { address, connecting } = useWallet();
+  return (
+    <>
+      <span data-testid="address">{address ?? 'null'}</span>
+      <span data-testid="connecting">{String(connecting)}</span>
+    </>
+  );
+}
+
+function renderStateProbe() {
+  return render(
+    <ToastProvider>
+      <WalletProvider>
+        <WalletStateProbe />
+      </WalletProvider>
+    </ToastProvider>,
+  );
+}
+
 function renderSignMessageProbe(message = 'hello') {
   return render(
     <ToastProvider>
@@ -114,6 +142,22 @@ describe('wallet connect flow', () => {
     renderButton();
 
     expect(await screen.findByRole('button', { name: /connect wallet/i })).toBeInTheDocument();
+  });
+
+  it('leaves address null and connecting false when session restore rejects, without an error toast', async () => {
+    mockGetAddress.mockRejectedValue(new Error('not connected'));
+
+    renderStateProbe();
+
+    // `connecting` starts true (restore in progress) and must flip to
+    // false once getAddress() settles, even though it rejected.
+    expect(screen.getByTestId('connecting')).toHaveTextContent('true');
+    expect(screen.getByTestId('address')).toHaveTextContent('null');
+
+    await waitFor(() => expect(screen.getByTestId('connecting')).toHaveTextContent('false'));
+
+    expect(screen.getByTestId('address')).toHaveTextContent('null');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('restores an already-authorized session on mount', async () => {
