@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
+import { LocaleSwitcher } from '@/components/layout/LocaleSwitcher';
 import { Logo } from '@/components/layout/Logo';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import { ConnectWalletButton } from '@/components/wallet/ConnectWalletButton';
@@ -33,6 +34,9 @@ export function Header() {
 
   useEffect(() => {
     if (!address) {
+      // A disconnected wallet must not keep showing the NGO Admin link from
+      // a previous session's lookup.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setOwnsNgo(false);
       return;
     }
@@ -103,6 +107,7 @@ export function Header() {
                 {link.label}
               </Link>
             ))}
+            <LocaleSwitcher />
             <ThemeToggle />
             <ConnectWalletButton />
           </nav>
@@ -157,6 +162,7 @@ export function Header() {
                 </Link>
               );
             })}
+            <LocaleSwitcher />
             <ConnectWalletButton />
           </nav>
         )}

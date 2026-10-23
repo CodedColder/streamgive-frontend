@@ -7,6 +7,7 @@ import { ConnectWalletPrompt } from '@/components/common/ConnectWalletPrompt';
 import { useToast } from '@/components/toast/ToastProvider';
 import { useWallet } from '@/components/wallet/WalletProvider';
 import { useDonationVaultClient } from '@/lib/donationVaultClient';
+import { DURATIONS } from '@/lib/durations';
 import {
   describeAmountError,
   formatAmount,
@@ -27,14 +28,6 @@ import {
   txToastAction,
 } from '@/lib/stellar';
 import { describeContractError } from '@/lib/contractTypes';
-
-
-const DURATIONS = [
-  { label: '1 week', seconds: 7 * 24 * 60 * 60 },
-  { label: '1 month', seconds: 30 * 24 * 60 * 60 },
-  { label: '3 months', seconds: 90 * 24 * 60 * 60 },
-  { label: '1 year', seconds: 365 * 24 * 60 * 60 },
-];
 
 // Quick-fill shortcuts for the "Total amount" field, in whichever token is
 // currently selected (the field isn't pinned to a single currency, so

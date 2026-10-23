@@ -8,6 +8,7 @@ import { getStreams, type Stream } from '@/lib/api';
 import { describeContractError } from '@/lib/contractTypes';
 import { useDonationVaultClient } from '@/lib/donationVaultClient';
 import { describeAmountError, formatEstimatedFee, formatRate, parseAmount } from '@/lib/format';
+import { DURATIONS } from '@/lib/durations';
 import { txToastAction } from '@/lib/stellar';
 
 /**
@@ -23,13 +24,6 @@ export function computeModifyRate(balance: string, durationSeconds: number): big
   const rate = BigInt(balance) / BigInt(durationSeconds);
   return rate > 0n ? rate : null;
 }
-
-const DURATIONS = [
-  { label: '1 week', seconds: 7 * 24 * 60 * 60 },
-  { label: '1 month', seconds: 30 * 24 * 60 * 60 },
-  { label: '3 months', seconds: 90 * 24 * 60 * 60 },
-  { label: '1 year', seconds: 365 * 24 * 60 * 60 },
-];
 
 // The list this sits in comes from the backend's indexer, which polls on
 // an interval — a confirmed on-chain action can lag a few seconds before
